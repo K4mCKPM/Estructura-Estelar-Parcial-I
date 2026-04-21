@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from scipy.integrate import trapezoid
 
 sns.set_theme(style="darkgrid")
-ruta = r"RUTA\20051002.csv"
+ruta = r"./20051002.csv"
 
 
 ### Valores:
