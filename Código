@@ -1,0 +1,123 @@
+"""
+@author: KamCKPM
+"""
+
+import pandas as pd
+import seaborn as sns
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import trapezoid
+
+sns.set_theme(style="darkgrid")
+ruta = r"RUTA\20051002.csv"
+
+
+### Valores:
+Gregoriano = 20051002.5
+Juliano = 2453646.0
+D_angular_min = 31.98
+D_angular_gra = D_angular_min/60
+D_angular_rad = D_angular_gra * np.pi / 180
+Angulo_solido = 2 * np.pi * (1 - np.cos(D_angular_rad/2))
+Dist_solar = 1.497e11
+Radio_sol = 696.340e6
+Angulo_solido2 = np.pi* (Radio_sol/Dist_solar)**2
+
+
+### Constantes
+b = 2.897e-3
+h = 6.626e-34
+c = 2.998e8
+k = 1.381e-23
+sigma = 5.67e-8 # Constante de Stefan-Boltzmann
+
+### Variables
+lambda_max = 479.37e-9
+T = 5935
+
+
+### Lectura del archivo de datos:    
+with open(ruta, 'r') as f:
+    lineas = f.readlines()
+    
+datos = [linea.split() for linea in lineas[1:]] 
+nombres = ['Gregorian', 'Julian', 'Min_Wave', 'Max_Wave', 'Mode', 'Version', 
+           'Irradiance', 'Irr_Uncertainity', 'Quality']
+df = pd.DataFrame(datos, columns=nombres)
+
+df = df.apply(pd.to_numeric, errors='coerce')
+
+data = df.drop(columns=['Gregorian', 'Julian', 'Max_Wave', 'Mode', 'Version', 
+                        'Irr_Uncertainity', 'Quality'])
+
+
+### Intensidad de Planck
+
+def planck(lambd, Temp=T, h=h, c=c, k=k):
+
+    wav_m = lambd * 1e-9        # Se convierte nm a metros para el cálculo
+    
+    # Fórmula de Planck
+    exp_term = np.exp((h * c) / (wav_m * k * T))
+    intensity = (2 * h * c**2) / (wav_m**5 * (exp_term - 1))
+    
+    return intensity * 1e-9     # Se convierte de nuevo a nm
+
+### Valores para la curva de Intensidad de planck
+wavs = data['Min_Wave'].values
+curva_teorica = planck(wavs, T)
+
+### Integrar el flujo respecto a la longitud de onda
+def integral(data):
+    flujo_integrado = trapezoid(data['Irradiance'], data['Min_Wave'])
+
+    ### Flujo superficie
+    F_sup = flujo_integrado * (Dist_solar/Radio_sol)**2
+
+    ### Temperatura efectiva
+    T_eff = (F_sup / sigma)**(1/4)
+
+    print(f"""
+          Flujo integrado = {flujo_integrado} W/m^2
+          Flujo superficie = {F_sup} W/m^2
+          Temperatura efectiva = {T_eff} K
+          """)
+
+data['Intensidad_Especifica'] = data['Irradiance'] / Angulo_solido
+
+### Gráficas
+
+def flujo(data):
+    sns.lineplot(x='Min_Wave', y='Irradiance', data=data)
+    plt.title('Flujo monocromático VS Longitud de onda \n Fecha: 2 de Octubre de 2005')
+    plt.xlabel('Longitud de onda [nm]')
+    plt.ylabel('Flujo [$W \cdot m^{-2} \cdot nm^{-1}$]')
+
+def intensidad(data):    
+    sns.lineplot(x='Min_Wave', y='Intensidad_Especifica', data=data)
+    plt.title('Intensidad Especifica VS Longitud de onda \n Fecha: 2 de Octubre de 2005')
+    plt.xlabel('Longitud de onda [nm]')
+    plt.ylabel('Intensidad Específica [$W \cdot m^{-2} \cdot nm^{-1} \cdot sr^{-1}$]')
+    
+def curva_planck(data):
+    intensidad(data) #Graficamos la intensidad específica
+    
+    #Ajustamos la curva de planck
+    plt.plot(wavs, curva_teorica, label=f'Cuerpo Negro (T={T}K)', color='red', linestyle='--')
+    plt.title(f'Ajuste de Temperatura de Color: {T} K \n Fecha: 2 de Octubre de 2005')
+    plt.xlabel('Longitud de onda [nm]')
+    plt.ylabel('Intensidad Específica [$W \cdot m^{-2} \cdot nm^{-1} \cdot sr^{-1}$]')
+    plt.legend()
+    plt.show()
+    
+    
+#Descomentar alguna de las siguientes funciones para graficar
+
+#flujo(data)
+#intensidad(data)
+curva_planck(data)
+
+#Descomentar el siguiente para imprimir en consola los el flujo integrado 
+#y la temperatura efectiva
+
+#integral(data)
